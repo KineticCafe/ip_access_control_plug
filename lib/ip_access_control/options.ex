@@ -122,7 +122,9 @@ defmodule IpAccessControl.Options do
   end
 
   defp evaluate(:allow, allow_list) do
-    IpAccessControl.parse_allow_list(allow_list)
+    allow_list
+    |> IpAccessControl.parse_allow_list()
+    |> BitwiseIp.Blocks.optimize()
   end
 
   defp evaluate(_option, value) do

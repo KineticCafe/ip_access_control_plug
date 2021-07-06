@@ -116,7 +116,8 @@ defmodule IpAccessControl do
 
   alias Plug.Conn
 
-  @typep ip_block_list :: [%RemoteIp.Block{}, ...]
+  # @typep ip_block_list :: BitwiseIp.Blocks.t()
+  @typep ip_block_list :: list(BitwiseIp.Block.t())
 
   @doc "Initialize the plug with options."
   @spec init(keyword) :: keyword
@@ -155,7 +156,7 @@ defmodule IpAccessControl do
   `false`.
   """
   @spec allowed?(
-          Plug.Conn.t() | binary() | :inet.ip_address() | nil,
+          Plug.Conn.t() | binary() | :inet.ip_address() | nil | BitwiseIp.t(),
           [binary(), ...] | (() -> [binary(), ...]) | ip_block_list() | nil
         ) ::
           boolean
@@ -184,18 +185,18 @@ defmodule IpAccessControl do
   end
 
   def allowed?(remote_ip, allow_list) when is_binary(remote_ip) do
-    case :inet.parse_strict_address(to_charlist(remote_ip)) do
+    case BitwiseIp.parse(remote_ip) do
       {:ok, remote_ip} -> allowed?(remote_ip, allow_list)
       _ -> false
     end
   end
 
   def allowed?(remote_ip, allow_list) when is_tuple(remote_ip) do
-    encoded_ip = RemoteIp.Block.encode(remote_ip)
+    allowed?(BitwiseIp.encode(remote_ip), allow_list)
+  end
 
-    allow_list
-    |> parse_allow_list()
-    |> Enum.any?(&RemoteIp.Block.contains?(&1, encoded_ip))
+  def allowed?(%BitwiseIp{} = remote_ip, allow_list) do
+    BitwiseIp.Blocks.contain?(parse_allow_list(allow_list), remote_ip)
   end
 
   def allowed?(_, _) do
@@ -206,8 +207,8 @@ defmodule IpAccessControl do
   def parse_allow_list(list) do
     Enum.map(list, fn item ->
       case item do
-        %RemoteIp.Block{} -> item
-        _ -> RemoteIp.Block.parse!(item)
+        %BitwiseIp.Block{} -> item
+        _ -> BitwiseIp.Block.parse!(item)
       end
     end)
   end
